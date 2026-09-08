@@ -281,19 +281,10 @@ export const recalculateXp = async (userId) => {
   }).populate("habit");
 
   for (const proof of verifiedProofs) {
-    const habit = proof.habit;
-    if (!habit) continue;
+    // 1) Just read the hardcoded points from the database
+    let itemXp = Number(proof.points || 0);
 
-    const type = (habit.habitName || "").trim().toLowerCase();
-
-    // 1) Base Habit XP
-    let itemXp = HABIT_XP[type] ? HABIT_XP[type].base + HABIT_XP[type].verified : 10;
-
-    // 2) AI proof points bonus
-    const proofPoints = Number(proof.points || 0);
-    itemXp += Math.max(0, proofPoints - 1);
-
-    // ⚡ 3) ONLY MULTIPLY THIS SPECIFIC PROOF IF EARNED WHILE PREMIUM
+    // 2) Apply premium multiplier if applicable
     if (proof.isPremiumXP) {
       itemXp *= 2;
     }
