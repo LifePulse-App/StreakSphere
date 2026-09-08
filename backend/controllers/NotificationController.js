@@ -192,6 +192,51 @@ export async function sendDeliveredNotification(toUserId, peerUserId, messageIds
 }
 
 /**
+ * ⚡ NEW: Send Like Notification
+ */
+export async function sendLikeNotification(toUserId, likerName, postId) {
+  const tokens = await PushToken.find({ userId: toUserId, platform: { $in: ['android', 'ios'] } }).lean();
+  if (!tokens.length) return;
+
+  await sendNotificationFCM(tokens, {
+    type: 'post_like',
+    title: 'New Like ❤️',
+    body: `${likerName} liked your post.`,
+    postId: String(postId),
+  });
+}
+
+/**
+ * ⚡ NEW: Send Comment Notification
+ */
+export async function sendCommentNotification(toUserId, commenterName, postId, commentText) {
+  const tokens = await PushToken.find({ userId: toUserId, platform: { $in: ['android', 'ios'] } }).lean();
+  if (!tokens.length) return;
+
+  await sendNotificationFCM(tokens, {
+    type: 'post_comment',
+    title: 'New Comment 💬',
+    body: `${commenterName} commented on your post.`,
+    postId: String(postId),
+  });
+}
+
+/**
+ * ⚡ NEW: Broadcast to Friends (Used for Posts and Moods)
+ */
+export async function sendFriendBroadcastNotification(friendIds, payload) {
+  if (!friendIds || !friendIds.length) return;
+  
+  const tokens = await PushToken.find({ 
+    userId: { $in: friendIds }, 
+    platform: { $in: ['android', 'ios'] } 
+  }).lean();
+  
+  if (!tokens.length) return;
+  await sendNotificationFCM(tokens, payload);
+}
+
+/**
  * Notify portal OWNER(s) when a new join request is sent.
  * @param {ObjectId} portalCreatorId 
  * @param {String} portalName

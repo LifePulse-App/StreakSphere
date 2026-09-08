@@ -12,6 +12,8 @@ import {
   ScrollView,
   Text
 } from 'react-native';
+import ImageResizer from 'react-native-image-resizer';
+import { PinchGestureHandler, State } from 'react-native-gesture-handler'; 
 import {
   Camera,
   useCameraPermission,
@@ -85,6 +87,9 @@ const ProofVisionCameraScreen = ({ navigation }: any) => {
   const photoOutput = usePhotoOutput();
   const [uploading, setUploading] = useState(false);
 
+  const [zoom, setZoom] = useState(1);
+  const baseZoom = useRef(1);
+
   const [caption, setCaption] = useState('');
   const [privacyScope, setPrivacyScope] = useState('friends');
   const [selectedHabit, setSelectedHabit] = useState<Habit | null>(null);
@@ -100,6 +105,32 @@ const ProofVisionCameraScreen = ({ navigation }: any) => {
   useEffect(() => {
     if (!hasPermission) requestPermission();
   }, [hasPermission]);
+
+  useEffect(() => {
+    if (device) {
+      const initialZoom = device.neutralZoom ?? 1;
+      setZoom(initialZoom);
+      baseZoom.current = initialZoom;
+    }
+  }, [device]);
+
+  const onPinchEvent = (event: any) => {
+    if (!device) return;
+    const scale = event.nativeEvent.scale;
+    let newZoom = baseZoom.current * scale;
+    
+    const minZoom = device.minZoom ?? 1;
+    const maxZoom = Math.min(device.maxZoom ?? 10, 10);
+    
+    newZoom = Math.max(minZoom, Math.min(newZoom, maxZoom));
+    setZoom(newZoom);
+  };
+
+  const onPinchStateChange = (event: any) => {
+    if (event.nativeEvent.state === State.END) {
+      baseZoom.current = zoom;
+    }
+  };
 
   const groupHabits = (items: Habit[]): HabitSection[] => {
     const byGroup: Record<string, Habit[]> = {};
@@ -169,19 +200,67 @@ const ProofVisionCameraScreen = ({ navigation }: any) => {
   const handleTakePhoto = async () => {
     try {
       const photo = await photoOutput.capturePhoto({ flashMode: 'off' }, {});
-      const path = await photo.saveToTemporaryFileAsync();
-      setMediaUri(`file://${path}`);
+      
+      // 1. Capture dimensions safely before disposing
+      const imgWidth = photo.width;
+      const imgHeight = photo.height;
+      const rawPath = await photo.saveToTemporaryFileAsync();
+      
+      if (photo.dispose) photo.dispose();
+      
+      let finalUri = `file://${rawPath}`;
+
+      if (Platform.OS === 'android') {
+        // 2. If Width > Height, the physical pixels are horizontal
+        const isLandscape = imgWidth > imgHeight;
+        
+        if (isLandscape) {
+          // "left" means it needs to be rotated 90 degrees to be upright
+          const rotationDegrees = cameraPosition === 'front' ? 270 : 90;
+          
+          // 3. Physically rotate the pixels
+          const resized = await ImageResizer.createResizedImage(
+            finalUri,
+            1080,
+            1080,
+            'JPEG',
+            90,
+            rotationDegrees
+          );
+          
+          finalUri = resized.uri;
+        }
+      } else {
+        // iOS natively respects EXIF, so we just compress it normally
+        finalUri = await ImageCompressor.compress(finalUri, {
+          compressionMethod: 'auto',
+          maxWidth: 1080,   
+          maxHeight: 1080,
+          quality: 0.9,     
+          returnableOutputType: 'uri'
+        });
+      }
+
+      setMediaUri(finalUri);
       setViewState('preview');
-      photo.dispose();
-    } catch (err) { 
-      setModalMessage('Failed to capture photo.'); 
+      
+    } catch (err: any) { 
+      console.error("Capture Error:", err);
+      setModalMessage(`Capture failed: ${err.message || 'Unknown error'}`); 
     }
   };
 
   const openGallery = async () => {
-    const result = await launchImageLibrary({ mediaType: 'photo', selectionLimit: 1 });
-    if (result.assets && result.assets.length > 0) {
-      setMediaUri(result.assets[0].uri || null);
+    const result = await launchImageLibrary({ 
+      mediaType: 'photo', 
+      selectionLimit: 1,
+      maxWidth: 1080, 
+      maxHeight: 1080,
+      quality: 0.9 
+    });
+    
+    if (result.assets && result.assets.length > 0 && result.assets[0].uri) {
+      setMediaUri(result.assets[0].uri);
       setViewState('preview');
     }
   };
@@ -190,23 +269,14 @@ const ProofVisionCameraScreen = ({ navigation }: any) => {
     if (!selectedHabit) return setModalMessage("Please select an activity first.");
     if (!mediaUri) return;
 
-    setUploading(true); // Disables the button to prevent double-taps during the exit transition
-    navigation.goBack(); // Instantly return to the previous screen
+    setUploading(true);
+    navigation.goBack(); 
 
-    // Fire-and-forget background upload
     (async () => {
       try {
-        const compressedUri = await ImageCompressor.compress(mediaUri, {
-          compressionMethod: 'auto',
-          maxWidth: 1080,   
-          maxHeight: 1080,
-          quality: 0.8,     
-          returnableOutputType: 'uri'
-        });
-
         const formData = new FormData();
         formData.append('proof', {
-          uri: compressedUri,
+          uri: mediaUri,
           name: 'photo.jpg',
           type: 'image/jpeg',
         } as any);
@@ -218,9 +288,6 @@ const ProofVisionCameraScreen = ({ navigation }: any) => {
         console.log("Post uploaded successfully in the background.");
       } catch (err) {
         console.error("Background upload failed:", err);
-        // Note: Because the screen is already unmounted, setModalMessage won't be visible.
-        // If you want to notify the user of a failure, you'll need to trigger a global Toast 
-        // or update an app-wide context state here instead.
       }
     })();
   };
@@ -229,7 +296,22 @@ const ProofVisionCameraScreen = ({ navigation }: any) => {
     return (
       <View style={styles.root}>
         {device && hasPermission ? (
-          <Camera style={StyleSheet.absoluteFill} device={device} isActive={true} outputs={[photoOutput]} />
+          <PinchGestureHandler
+            onGestureEvent={onPinchEvent}
+            onHandlerStateChange={onPinchStateChange}
+          >
+            <View style={StyleSheet.absoluteFill}>
+              <Camera 
+                style={StyleSheet.absoluteFill} 
+                device={device} 
+                isActive={true} // 🚨 Reverted back to true so capture doesn't crash
+                outputs={[photoOutput]} 
+                photo={true} 
+                zoom={zoom} 
+                orientation="portrait" // 🚨 MAGIC FIX: Locks the Android hardware buffer upright!
+              />
+            </View>
+          </PinchGestureHandler>
         ) : (
           <View style={styles.center}><AppActivityIndicator /></View>
         )}
@@ -322,9 +404,9 @@ const ProofVisionCameraScreen = ({ navigation }: any) => {
                 placeholder=""
                 placeholderTextColor="rgba(255,255,255,0)"
                 cursorColor="#F8FAFC"
-                selectionColor="#fff)"
+                selectionColor="#fff"
                 underlineColorAndroid="transparent"
-                autoCorrect={false} // Stops Android composition overlay turning text black
+                autoCorrect={false} 
                 spellCheck={false}
               />
             </View>
@@ -457,19 +539,19 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(148, 163, 184, 0.2)',
   },
   captionOverlay: {
-  position: 'absolute',
-  left: 0,
-  right: 0,
-  top: 0,
-  bottom: 0,
-  padding: CAPTION_PADDING,
-  fontSize: CAPTION_FONT_SIZE,
-  lineHeight: CAPTION_LINE_HEIGHT,
-  margin: 0,
-  includeFontPadding: false,
-  zIndex: 2,        // add
-  elevation: 2,      // add — required for Android stacking
-},
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    padding: CAPTION_PADDING,
+    fontSize: CAPTION_FONT_SIZE,
+    lineHeight: CAPTION_LINE_HEIGHT,
+    margin: 0,
+    includeFontPadding: false,
+    zIndex: 2,
+    elevation: 2,
+  },
   captionPlaceholder: {
     color: '#94A3B8',
     fontSize: CAPTION_FONT_SIZE,
@@ -487,19 +569,19 @@ const styles = StyleSheet.create({
     lineHeight: CAPTION_LINE_HEIGHT,
   },
   captionInput: {
-  flex: 1,
-  minHeight: 100,
-  fontSize: CAPTION_FONT_SIZE,
-  lineHeight: CAPTION_LINE_HEIGHT,
-  textAlignVertical: 'top',
-  padding: CAPTION_PADDING,
-  margin: 0,
-  includeFontPadding: false,
-  color: 'rgba(255, 255, 255, 0.02)',
-  backgroundColor: 'transparent',
-  zIndex: 1,        // add
-  elevation: 1,      // add
-},
+    flex: 1,
+    minHeight: 100,
+    fontSize: CAPTION_FONT_SIZE,
+    lineHeight: CAPTION_LINE_HEIGHT,
+    textAlignVertical: 'top',
+    padding: CAPTION_PADDING,
+    margin: 0,
+    includeFontPadding: false,
+    color: 'rgba(255, 255, 255, 0.02)',
+    backgroundColor: 'transparent',
+    zIndex: 1,
+    elevation: 1,
+  },
 
   divider: { height: 1, backgroundColor: 'rgba(148, 163, 184, 0.15)', marginBottom: 20 },
   detailRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(148, 163, 184, 0.15)' },

@@ -3,6 +3,7 @@ import Proof from "../models/ProofSchema.js";
 import Comment from "../models/CommentSchema.js";
 import User from "../models/UserSchema.js";
 import mongoose from "mongoose";
+import { sendCommentNotification, sendLikeNotification } from "./NotificationController.js";
 
 // ==========================================
 // 1. Fetch Activity Feed
@@ -161,6 +162,14 @@ export const toggleLikePost = async (req, res) => {
     } else {
       post.likes.push(userId);
       post.likesCount += 1;
+
+  // ⚡ NEW: Send Push Notification (Don't notify if liking own post)
+      if (post.user.toString() !== userId.toString()) {
+        const liker = await User.findById(userId).select("name username");
+        const likerName = liker?.name || liker?.username || "Someone";
+        // Do not await to avoid blocking the API response
+        sendLikeNotification(post.user, likerName, post._id).catch(err => console.error("Push Error:", err));
+      }
     }
 
     await post.save();
@@ -203,6 +212,12 @@ export const addComment = async (req, res) => {
     await post.save();
 
     await newComment.populate("user", "username avatarUrl tick isPremium");
+
+    // ⚡ NEW: Send Push Notification (Don't notify if commenting on own post)
+    if (post.user.toString() !== userId.toString()) {
+      const commenterName = newComment.user.name || newComment.user.username || "Someone";
+      sendCommentNotification(post.user, commenterName, post._id, text).catch(err => console.error("Push Error:", err));
+    }
 
     const formattedComment = {
       id: newComment._id,
