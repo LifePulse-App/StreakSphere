@@ -6,6 +6,7 @@ import { recalculateXp } from "./XpController.js";
 import { getTimeSlotForDate } from "../utils/timeSlotCheck.js";
 import fs from "fs";
 import FormData from "form-data"; 
+import { sendFriendBroadcastNotification } from "./NotificationController.js";
 
 export const submitProof = async (req, res) => {
   try {
@@ -82,9 +83,24 @@ export const submitProof = async (req, res) => {
     proof.aiScore = aiRes.data.score;
     if (proof.verified) proof.verifiedAt = new Date();
 
+
+      // ⚡ NEW: Notify all friends about the new post
+      const validFriends = userDoc.friends?.map(f => f.user) || [];
+      if (validFriends.length > 0) {
+        const userName = userDoc.name || userDoc.username || "A friend";
+        sendFriendBroadcastNotification(validFriends, {
+          type: 'friend_post',
+          title: 'New Post!',
+          body: `${userName} uploaded a new post.`,
+          postId: String(proof._id),
+        }).catch(err => console.error("Push Error:", err));
+      }
+    
+
     await proof.save();
 
     if (proof.verified) await recalculateXp(userId);
+
 
     return res.json({
       success: true,

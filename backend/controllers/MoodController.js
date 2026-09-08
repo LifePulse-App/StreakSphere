@@ -41,6 +41,17 @@ if (location?.coords) {
     });
 }
 
+// ⚡ NEW: Send Push Notification to all friends
+    const validFriends = user.friends?.map(f => f.user) || [];
+    if (validFriends.length > 0) {
+      const userName = user.name || user.username || "A friend";
+      sendFriendBroadcastNotification(validFriends, {
+        type: 'friend_mood',
+        title: 'Mood Update 💭',
+        body: `${userName} updated their mood.`,
+      }).catch(err => console.error("Push Error:", err));
+    }
+
     return res.status(201).json({
       success: true,
       message: "Mood logged successfully",

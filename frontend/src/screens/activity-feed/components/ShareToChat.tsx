@@ -189,7 +189,12 @@ const handleSend = async (userItem: any) => {
 
             return (
               <View style={styles.friendRow}>
-                <Image source={{ uri: avatarUri || 'https://via.placeholder.com/150' }} style={styles.avatar} />
+                 {avatarUri ? (
+                               <Image source={{ uri: avatarUri }} style={styles.avatar} />
+                            ) : (
+                              <Icon name="account" size={20} color="#E5E7EB" />
+                            )}
+               
                 
                 <View style={styles.friendInfo}>
                   <View style={{ flexDirection: "row", alignItems: "center" }}>

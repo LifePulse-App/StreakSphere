@@ -325,7 +325,7 @@ const VerifyOtp = ({ navigation, route }: any) => {
               </TouchableOpacity>
 
               <Text style={styles.termsText} numberOfLines={2}>
-                Didn’t receive the code? Check your spam folder or wait a few
+                Didn’t receive the code? Check your spam/junk folder or wait a few
                 moments before requesting again.
               </Text>
             </View>

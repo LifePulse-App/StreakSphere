@@ -717,7 +717,7 @@ const fetchDashboardInBackground = useCallback(async () => {
                 {finalAvatarUri ? (
                   <FastImage style={{ width: '100%', height: '100%' }} source={{ uri: finalAvatarUri, priority: FastImage.priority.normal }} resizeMode={FastImage.resizeMode.cover} />
                 ) : (
-                  <Icon name="account-circle-outline" size={26} color="#E5E7EB" />
+                  <Icon name="account" size={26} color="#E5E7EB" />
                 )}
               </View>
               {(userBadges.tick === 'verified' || userBadges.tick === 'golden' || userBadges.isPremium) && (
@@ -811,7 +811,7 @@ const fetchDashboardInBackground = useCallback(async () => {
                           {finalAvatarUri ? (
                             <FastImage source={{ uri: finalAvatarUri }} style={styles.noteAvatarImage} />
                           ) : (
-                            <Icon name="account-circle-outline" size={56} color="#E5E7EB" />
+                            <Icon name="account" size={56} color="#E5E7EB" />
                           )}
                         </View>
 
@@ -851,7 +851,7 @@ const fetchDashboardInBackground = useCallback(async () => {
                                 {friendAvatarUri ? (
                                   <FastImage source={{ uri: friendAvatarUri }} style={styles.noteAvatarImage} />
                                 ) : (
-                                  <Icon name="account-circle-outline" size={56} color="#E5E7EB" />
+                                  <Icon name="account" size={56} color="#E5E7EB" />
                                 )}
                               </View>
                             </View>
@@ -976,6 +976,11 @@ const fetchDashboardInBackground = useCallback(async () => {
   onPress={() => navigation.navigate("UserProfile", { userId: item.user.id })} 
   activeOpacity={0.9}
 >
+   {userAvatarUri ? (
+                 <Image source={{ uri: userAvatarUri }} style={styles.avatarImage} />
+              ) : (
+                <Icon name="account" size={20} color="#E5E7EB" />
+              )}
   <Image source={{ uri: userAvatarUri }} style={styles.avatarImage} />
 </TouchableOpacity>
                           <View style={styles.usernameTextWrap}>
@@ -1267,11 +1272,11 @@ const styles = StyleSheet.create({
 
   inlinePostCard: { 
     width: "100%", 
-    height: 500, 
+    height: 580, 
     overflow: "hidden", 
     backgroundColor: "#000", 
     position: "relative", 
-    marginBottom: 10 
+    marginBottom: 30 
   },
   inlinePostImage: { ...StyleSheet.absoluteFill, width: "100%", height: "100%" },
   imageOverlayGradient: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(0, 0, 0, 0.3)" },

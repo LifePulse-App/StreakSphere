@@ -312,7 +312,6 @@ const App = () => {
 
   useEffect(() => {
     loadChatNotificationState();
-    requestNotificationPermission();
   }, []);
 
   useEffect(() => {
@@ -623,8 +622,13 @@ const App = () => {
   useEffect(() => {
     if (!isCheckingBiometric) {
      hideSplash();
+     setTimeout(() => {
+        if (User) {
+          requestNotificationPermission();
+        }
+      }, 1500);
     }
-  }, [isCheckingBiometric]);
+  }, [isCheckingBiometric, User]);
 
     // ⚡ 30-SECOND TIMER FOR RATE CARD
  // Replace your existing checkRateStatus useEffect in App.tsx with this robust version:
