@@ -5,7 +5,10 @@ type FriendStatusResponse = { isFriend: boolean; requestSent?: boolean; requestI
 type FriendsListResponse = { friends: Array<{ _id: string; name: string; username?: string; avatar?: any; since?: string }> };
 type PendingRequestsResponse = { requests: Array<{ _id: string; name: string; username?: string; avatar?: any; requestedAt?: string }> };
 type SearchUsersResponse = { user: Array<{ _id: string; name: string; username?: string; avatar?: any; isFriend?: boolean; requestSent?: boolean; requestIncoming?: boolean }>; filteredUsersCount: number };
-type SuggestedUsersResponse = { suggestions: Array<{ _id: string; name: string; username?: string; avatar?: any; isFriend?: boolean; requestSent?: boolean; requestIncoming?: boolean }> };
+type SuggestedUsersResponse = { 
+  suggestions: Array<{ _id: string; name: string; username?: string; avatar?: any; isFriend?: boolean; requestSent?: boolean; requestIncoming?: boolean }>;
+  hasMore: boolean; 
+};
 
 // Send a friend request
 const sendFriendRequest = async (targetUserId: string) => {
@@ -96,10 +99,9 @@ const searchUsers = async (query: string) => {
   }
 };
 
-// Suggested users (not yet friends)
-const getSuggestedUsers = async (limit = 6) => {
+const getSuggestedUsers = async (page = 1, limit = 10) => {
   try {
-    return await client.get<SuggestedUsersResponse>(`/friends/suggested?limit=${limit}`);
+    return await client.get<SuggestedUsersResponse>(`/friends/suggested?page=${page}&limit=${limit}`);
   } catch (error: any) {
     if (!error.response) throw new Error("Server is offline, try again later.");
     throw error;

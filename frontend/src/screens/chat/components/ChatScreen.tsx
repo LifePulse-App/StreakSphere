@@ -1249,7 +1249,7 @@ export default function ChatScreen({ route, navigation }: any) {
         {
           id: String(route.params.peerUserId),
           name: route.params.peerName || "Friend",
-          avatar: newUrl + String(route.params.peerAvatarUrl || route.params.avatarUrl || ""),
+          avatar: route.params.peerAvatarUrl || route.params.avatarUrl ? newUrl + String(route.params.peerAvatarUrl || route.params.avatarUrl || "") : "",
         }, 
         conversationId 
       );

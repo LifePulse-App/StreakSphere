@@ -342,7 +342,7 @@ if (user.refreshToken) {
         {/* --- MOVED REGISTRATION TO BOTTOM FOOTER --- */}
         <View style={{ 
             paddingVertical: 20, 
-            paddingBottom: Platform.OS === 'ios' ? 40 : 40, 
+            paddingBottom: Platform.OS === 'ios' ? 40 : 60, 
             alignItems: 'center',
             borderTopWidth: 0.5,
             borderTopColor: 'rgba(255, 255, 255, 0.1)' // subtle separator line 

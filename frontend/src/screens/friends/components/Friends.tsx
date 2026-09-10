@@ -9,6 +9,7 @@ import {
   Platform,
   StatusBar,
   Image,
+  ActivityIndicator, // ⚡ ADDED: For the loading spinner
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import NetInfo from "@react-native-community/netinfo";
@@ -75,9 +76,14 @@ const GlassConfirmModal = ({
   );
 };
 
+// ⚡ ADDED: Helper to detect when ScrollView hits the bottom
+const isCloseToBottom = ({ layoutMeasurement, contentOffset, contentSize }: any) => {
+  const paddingToBottom = 50; // trigger a bit before they hit the absolute bottom
+  return layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
+};
+
 const Friends = ({ navigation }: any) => {
   const authContext = useContext(AuthContext);
-  // ⚡ FIX 1: Safely extract ID (checks both _id and id) to prevent Cache overlap when switching accounts
   const currentUserId = authContext?.User?.user?._id || authContext?.User?.user?.id;
 
   const [search, setSearch] = useState("");
@@ -89,6 +95,11 @@ const Friends = ({ navigation }: any) => {
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [showRemoveModal, setShowRemoveModal] = useState<{ user: UserProfile | null } | null>(null);
   const [avatarMap, setAvatarMap] = useState<Record<string, string | null>>({});
+
+  // ⚡ ADDED: Pagination State
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const isSearching = search.trim().length > 0;
   const offlineRef = useRef(false);
@@ -192,17 +203,41 @@ const Friends = ({ navigation }: any) => {
     }
   }, [cacheKeys]);
 
-  const fetchSuggestions = useCallback(async () => {
+  // ⚡ MODIFIED: Accepts pageNum and appends to the list
+  const fetchSuggestions = useCallback(async (pageNum = 1) => {
     if (offlineRef.current) return;
+    if (pageNum > 1) setLoadingMore(true);
+
     try {
-      const res = await socialApi.getSuggestedUsers(5);
+      // Passes pageNum and limit (10)
+      const res = await socialApi.getSuggestedUsers(pageNum, 10);
       const data = (res?.data?.suggestions ?? []).filter((u: any) => u?._id);
-      setSuggestions(data);
-      await saveCache(cacheKeys.suggestions, data);
+
+      if (pageNum === 1) {
+        setSuggestions(data);
+        await saveCache(cacheKeys.suggestions, data);
+      } else {
+        setSuggestions((prev) => {
+          const existingIds = new Set(prev.map((p) => p._id));
+          const newItems = data.filter((d: any) => !existingIds.has(d._id));
+          return [...prev, ...newItems];
+        });
+      }
+      setHasMore(res?.data?.hasMore ?? false);
+      setPage(pageNum);
     } catch (e) {
       console.log("[FRIENDS] fetchSuggestions error:", e);
+    } finally {
+      setLoadingMore(false);
     }
   }, [cacheKeys]);
+
+  // ⚡ ADDED: Load more function triggered by scroll
+  const handleLoadMore = () => {
+    if (!isSearching && hasMore && !loadingMore && !offline) {
+      fetchSuggestions(page + 1);
+    }
+  };
 
   const fetchSearch = useCallback(async () => {
     const key = cacheKeys.search(search);
@@ -226,7 +261,7 @@ const Friends = ({ navigation }: any) => {
   }, [search, cacheKeys]);
 
   useEffect(() => {
-    fetchSuggestions();
+    fetchSuggestions(1); // ⚡ Pass page 1 on mount
     fetchRequests();
   }, [fetchSuggestions, fetchRequests]);
 
@@ -276,7 +311,7 @@ const Friends = ({ navigation }: any) => {
     try {
       await socialApi.sendFriendRequest(user._id);
       setNotification({ type: "success", message: `Request sent to ${user.name || user.username}` });
-      isSearching ? await fetchSearch() : await fetchSuggestions();
+      isSearching ? await fetchSearch() : await fetchSuggestions(1);
       await fetchRequests();
     } catch (e) {
       console.log("[FRIENDS] handleAddFriend error:", e);
@@ -290,7 +325,7 @@ const Friends = ({ navigation }: any) => {
     try {
       await socialApi.removeFriendRequest(user._id);
       setNotification({ type: "success", message: `Removed request to ${user.name || user.username}` });
-      isSearching ? await fetchSearch() : await fetchSuggestions();
+      isSearching ? await fetchSearch() : await fetchSuggestions(1);
       await fetchRequests();
     } catch (e) {
       console.log("[FRIENDS] handleCancelRequest error:", e);
@@ -311,7 +346,7 @@ const Friends = ({ navigation }: any) => {
       setNotification({ type: "success", message: `Accepted request from ${req.user.name}` });
       setAcceptedIds((prev) => [...prev, id]); 
       setFriendRequests((prev) => prev.filter((r) => r.user._id !== id));
-      isSearching ? await fetchSearch() : await fetchSuggestions();
+      isSearching ? await fetchSearch() : await fetchSuggestions(1);
       await fetchRequests();
     } catch (e) {
       setNotification({ type: "error", message: "Couldn't accept request." });
@@ -332,7 +367,7 @@ const Friends = ({ navigation }: any) => {
       await socialApi.removeFriendRequest(id);
       setNotification({ type: "success", message: `Rejected request from ${req.user.name}` });
       setFriendRequests((prev) => prev.filter((r) => r.user._id !== id));
-      isSearching ? await fetchSearch() : await fetchSuggestions();
+      isSearching ? await fetchSearch() : await fetchSuggestions(1);
       await fetchRequests();
     } catch (e) {
       setNotification({ type: "error", message: "Couldn't reject request." });
@@ -411,7 +446,7 @@ const Friends = ({ navigation }: any) => {
             >
               <Icon name="close" size={18} color="#F9FAFB" />
               <Text style={styles.addBtnText}>
-                {loadingActions === user._id ? "..." : "Reject"}
+                {loadingActions === user._id ? "Rejecting..." : "Reject"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -419,13 +454,24 @@ const Friends = ({ navigation }: any) => {
           <TouchableOpacity
             style={[styles.addBtn, { backgroundColor: "#6366f1" }]}
             activeOpacity={0.85}
-            onPress={() => setNotification({ type: "success", message: `Open chat with ${user.name || user.username}` })}
+            onPress={() =>
+              
+          navigation.navigate("chat", {
+            conversationId: user.conversationId,
+            peerUserId: user._id,
+            peerName: user.name,
+            peerAvatarUrl: user.avatar,
+            amIBlocked: user.amIBlocked,
+            didIBlock: user.didIBlock,
+            tick: user.tick,
+            isPremium: user.showPremiumBadge
+          })
+         }
           >
             <Icon name="chat" size={18} color="#F9FAFB" />
             <Text style={styles.addBtnText}>Chat</Text>
           </TouchableOpacity>
         ) : user.requestIncoming ? (
-          // ⚡ FIX 2: SWAPPED PRIORITY. Incoming requests MUST be evaluated BEFORE Sent requests.
           <TouchableOpacity
             style={[styles.addBtn, { backgroundColor: "#22C55E" }]}
             activeOpacity={0.85}
@@ -495,7 +541,17 @@ const Friends = ({ navigation }: any) => {
             <View style={styles.topRightSpacer} />
           </View>
 
-          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <ScrollView 
+            contentContainerStyle={styles.scrollContent} 
+            showsVerticalScrollIndicator={false}
+            // ⚡ ADDED: Trigger pagination when scrolling hits the bottom!
+            onScroll={({ nativeEvent }) => {
+              if (isCloseToBottom(nativeEvent)) {
+                handleLoadMore();
+              }
+            }}
+            scrollEventThrottle={400}
+          >
             <View style={styles.searchCard}>
               <Icon name="magnify" size={20} color="#9CA3AF" style={{ marginRight: 8 }} />
               <TextInput
@@ -570,6 +626,13 @@ const Friends = ({ navigation }: any) => {
                   scrollEnabled={false}
                   ItemSeparatorComponent={() => <View style={styles.listSeparator} />}
                 />
+              </View>
+            )}
+
+            {/* ⚡ ADDED: Loading Spinner when fetching next page */}
+            {loadingMore && (
+              <View style={{ paddingVertical: 20, alignItems: "center" }}>
+                <ActivityIndicator size="small" color="#9CA3AF" />
               </View>
             )}
 

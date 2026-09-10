@@ -51,9 +51,7 @@ const formatTime = (seconds: number) => {
           {remoteUser.avatar ? (
             <Image source={{ uri: remoteUser.avatar }} style={styles.avatarImage} />
           ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarText}>{remoteUser.name.charAt(0)}</Text>
-            </View>
+            <Icon name="account" size={80} color="#fff" />
           )}
         </View>
         <Text style={styles.userName}>{remoteUser.name}</Text>

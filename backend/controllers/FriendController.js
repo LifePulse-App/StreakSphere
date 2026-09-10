@@ -58,10 +58,10 @@ export const sendFriendRequest = catchAsyncErrors(async (req, res) => {
   await them.save();
   
   await sendToUser(targetUserId, {
-    ...TEMPLATES.FRIEND_REQUEST_SENT(req.user.name),
+    ...TEMPLATES.FRIEND_REQUEST_SENT(me.name),
     extra: {
       fromUserId: String(req.user._id),
-      fromName: String(req.user.name),
+      fromName: String(me.name),
     },
   });
   
@@ -92,10 +92,10 @@ const currentUserId = req.user.id;
   await me.save();
   await them.save();
   await sendToUser(requesterId, {
-    ...TEMPLATES.FRIEND_REQUEST_ACCEPTED(req.user.name),
+    ...TEMPLATES.FRIEND_REQUEST_ACCEPTED(me.name),
     extra: {
       fromUserId: String(req.user._id),
-      fromName: String(req.user.name),
+      fromName: String(me.name),
     },
   });
   return res.json({ message: "Request accepted", isFriend: true, isPremium: me.isPremium });
@@ -332,7 +332,11 @@ export const searchUsers = catchAsyncErrors(async (req, res) => {
 
 export const suggestedFriends = catchAsyncErrors(async (req, res) => {
   const currentUserId = req.user._id;
-  const limit = parseInt(req.query.limit) || 20;
+  
+  // ⚡ 1. Extract pagination params from the query (Default: Page 1, Limit 10)
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const skip = (page - 1) * limit;
 
   const me = await User.findById(currentUserId)
     .select("friendRequests friends blockedUsers blockedBy isPremium")
@@ -347,8 +351,17 @@ export const suggestedFriends = catchAsyncErrors(async (req, res) => {
     ...blockedIds
   ];
 
+  // ⚡ 2. Count total available users to determine if there are more pages
+  const totalUsers = await User.countDocuments({ 
+    accountStatus: 'active', 
+    _id: { $nin: excludeIds } 
+  });
+
+  // ⚡ 3. Apply skip, limit, and a STABLE sort (Required for pagination)
   let users = await User.find({ accountStatus: 'active', _id: { $nin: excludeIds } })
-    .select("name username avatarUrl friendRequests friends isPremium premiumPreferences tick") // ⚡ Fetch premium preferences
+    .select("name username avatarUrl friendRequests friends isPremium premiumPreferences tick") 
+    .sort({ createdAt: -1 }) // Do not use random shuffle, it breaks pagination!
+    .skip(skip)
     .limit(limit)
     .lean();
 
@@ -357,7 +370,6 @@ export const suggestedFriends = catchAsyncErrors(async (req, res) => {
     const requestSent = u.friendRequests?.some(r => String(r.user) === String(currentUserId));
     const incoming = me?.friendRequests?.some(r => String(r.user) === String(u._id));
     
-    // ⚡ Safely calculate badge visibility based on preference
     const showBadge = u.isPremium && u.premiumPreferences?.premiumBadge !== false;
     
     return {
@@ -374,8 +386,12 @@ export const suggestedFriends = catchAsyncErrors(async (req, res) => {
     };
   });
 
-  const shuffled = users.sort(() => 0.5 - Math.random());
-  res.status(200).json({ suggestions: shuffled, isPremium: me.isPremium });
+  // ⚡ 4. Return hasMore flag alongside the suggestions
+  res.status(200).json({ 
+    suggestions: users, 
+    hasMore: totalUsers > (skip + users.length), // Tells frontend if it should keep loading
+    isPremium: me.isPremium 
+  });
 });
 
 // ==========================================

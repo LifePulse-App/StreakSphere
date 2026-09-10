@@ -1,6 +1,7 @@
 import Mood from "../models/MoodSchema.js";
 import User from "../models/UserSchema.js";
 import Location from "../models/LocationSchema.js";
+import { sendFriendBroadcastNotification } from "./NotificationController.js";
 
 // POST /api/moods
 // body: { mood: string }
@@ -17,7 +18,8 @@ export const createMood = async (req, res) => {
         .json({ success: false, message: "Mood is required" });
     }
 
-    const user = await User.findById(userId).select("_id");
+    // ⚡ FIX: Select name, username, and friends!
+    const user = await User.findById(userId).select("name username friends");
     if (!user) {
       return res
         .status(404)
