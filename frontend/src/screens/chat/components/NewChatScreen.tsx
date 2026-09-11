@@ -97,11 +97,24 @@ export default function NewChatScreen({ navigation }: any) {
       item.avatarUrl ||
       item.avatarThumbnailUrl ||
       "";
-    return raw.startsWith("http") ? raw : newUrl + raw;
+      
+    return raw.startsWith("https") ? raw : newUrl + raw;
+  };
+
+  const getAvatarUrls = (item: Friend) => {
+    let raw =
+      (typeof item.avatar === "string" ? item.avatar :
+        item.avatar?.url) ||
+      item.avatarUrl ||
+      item.avatarThumbnailUrl ||
+      "";
+      
+    return raw;
   };
 
   const renderAvatar = (item: Friend) => {
     const uri = getAvatarUrl(item);
+    
     const hasError = !!imageErrorMap[item._id];
 
     if (uri && !hasError) {
@@ -167,7 +180,7 @@ export default function NewChatScreen({ navigation }: any) {
                     navigation.navigate("chat", {
                       peerUserId: item._id,
                       peerName: item.name,
-                      peerAvatarUrl: getAvatarUrl(item),
+                      peerAvatarUrl: getAvatarUrls(item),
                       amIBlocked: item.amIBlocked,
                       didIBlock: item.didIBlock,
                       tick: item.tick,

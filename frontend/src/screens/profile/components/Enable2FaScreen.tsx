@@ -305,7 +305,7 @@ const Enable2FAScreen = () => {
       <Text style={styles.inputLabel}>6-digit 2FA code (optional)</Text>
       <TextInput
         style={styles.textInput}
-        placeholder="000000"
+        placeholder="Enter OTP..."
         placeholderTextColor="#64748B"
         value={disableCode}
         onChangeText={setDisableCode}
@@ -492,7 +492,7 @@ const Enable2FAScreen = () => {
               <Text style={styles.inputLabel}>Enter 6-digit code</Text>
               <TextInput
                 style={styles.textInput}
-                placeholder="000000"
+                placeholder="Enter OTP..."
                 placeholderTextColor="#64748B"
                 value={code}
                 onChangeText={setCode}

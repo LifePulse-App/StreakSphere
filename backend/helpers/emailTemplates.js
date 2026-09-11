@@ -214,7 +214,7 @@ const s = {
 export const welcomeEmailHtml = ({ username, email, logoDataUrl }) =>
   baseLayout({
     title: "Welcome to StreakSphere",
-    preview: "Your account is ready — let's build some streaks 🔥",
+    preview: "Your account is ready — let's explore 🔥",
     logoDataUrl,
     bodyHtml: `
       <div style="${s.badge('rgba(16,185,129,0.1)', '#34d399')}">
@@ -223,7 +223,7 @@ export const welcomeEmailHtml = ({ username, email, logoDataUrl }) =>
 
       <h1 style="${s.h1}">Welcome, ${username || email} 👋</h1>
       <p style="${s.p}">
-        Your StreakSphere account is live. Start tracking habits, building streaks, and staying consistent — one day at a time.
+        Your StreakSphere account is live. Welcome to new ERA Of Social Media... Explore it.
       </p>
 
       <div style="${s.divider}"></div>

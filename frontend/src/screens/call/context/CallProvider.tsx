@@ -240,23 +240,31 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         autoAccept = !!callData.autoAccept;
       }
 
+      // Inside CallProvider.tsx -> useEffect -> checkPendingCalls
+
       if (callData) {
         console.log('[CallProvider] Booting directly into call UI:', callData);
         notificationNavState.pending = null; 
         activeCallIdRef.current = callData.callId;
         
-        setCallPresentation('fullscreen'); // Force Full Screen because they came from lock screen
+        setCallPresentation('fullscreen');
         
+        // ⚡ FIX: Properly format the avatar URL for cold boots
+        const rawAvatar = callData.avatarUrl || callData.profileImage || '';
+        const formattedAvatar = rawAvatar ? (rawAvatar.startsWith('http') ? rawAvatar : `${newUrl}${rawAvatar}`) : "";
+
         setCurrentSession({
           sessionId: callData.callId,
           remoteUser: { 
             id: callData.callerId, 
             name: callData.callerName || 'User', 
-            avatar: callData.avatarUrl || '' 
+            avatar: formattedAvatar // ⚡ Use formatted avatar here
           },
           status: 'ringing',
           isIncoming: true,
         });
+
+        // ... rest of checkPendingCalls code ...
 
         stopAllTones();
 
@@ -291,9 +299,13 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       activeCallIdRef.current = data.callId;
       setCallPresentation('fullscreen');
       
+      // ⚡ FIX: Properly format the avatar URL for background taps
+      const rawAvatar = data.avatarUrl || data.profileImage || '';
+      const formattedAvatar = rawAvatar ? (rawAvatar.startsWith('http') ? rawAvatar : `${newUrl}${rawAvatar}`) : "";
+
       setCurrentSession({
         sessionId: data.callId,
-        remoteUser: { id: data.callerId, name: data.callerName || 'User', avatar: data.avatarUrl || '' },
+        remoteUser: { id: data.callerId, name: data.callerName || 'User', avatar: formattedAvatar }, // ⚡ Use formatted avatar here
         status: 'ringing',
         isIncoming: true,
       });

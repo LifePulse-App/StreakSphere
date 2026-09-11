@@ -16,6 +16,7 @@ import {
   Keyboard,
   Modal,
   useWindowDimensions,
+  RefreshControl,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { Text } from "@rneui/themed";
@@ -92,6 +93,65 @@ const MOOD_METADATA: Record<
   angry: { label: "Angry", icon: "emoticon-angry-outline", color: "#EF4444" },
 };
 
+import MoodService from "../../../moodscreen/services/api_mood"; // Adjust path if needed
+
+// Add these right under your existing MOOD_METADATA in Dashboard.tsx
+const MOOD_COLORS: Record<string, string> = {
+  ecstatic: "#FACC15", happy: "#FBBF24", grateful: "#F97316", calm: "#22C55E",
+  relaxed: "#38BDF8", lovely: "#FB7185", neutral: "#9CA3AF", meh: "#9CA3AF",
+  tired: "#818CF8", confused: "#F97316", sad: "#60A5FA", lonely: "#6B7280",
+  discouraged: "#F97316", numb: "#9CA3AF", anxious: "#F97316", stressed: "#FBBF24",
+  overwhelmed: "#38BDF8", annoyed: "#FB923C", frustrated: "#F97316", angry: "#EF4444",
+};
+
+const MOOD_GROUPS = [
+  {
+    id: "positive", title: "Feeling good", description: "Positive, energized, or calm",
+    moods: [
+      { id: "ecstatic", label: "Ecstatic", icon: "emoticon-excited-outline" },
+      { id: "happy", label: "Happy", icon: "emoticon-happy-outline" },
+      { id: "grateful", label: "Grateful", icon: "hand-heart-outline" },
+      { id: "calm", label: "Calm", icon: "meditation" },
+      { id: "relaxed", label: "Relaxed", icon: "emoticon-neutral-outline" },
+      { id: "lovely", label: "Lovely", icon: "heart-outline" },
+    ],
+  },
+  {
+    id: "neutral", title: "In the middle", description: "Neutral or mixed feelings",
+    moods: [
+      { id: "neutral", label: "Okay", icon: "emoticon-neutral-outline" },
+      { id: "meh", label: "Meh", icon: "minus-circle-outline" },
+      { id: "tired", label: "Tired", icon: "sleep" },
+      { id: "confused", label: "Confused", icon: "help-circle-outline" },
+    ],
+  },
+  {
+    id: "low", title: "Feeling low", description: "Sad, lonely, or down",
+    moods: [
+      { id: "sad", label: "Sad", icon: "emoticon-sad-outline" },
+      { id: "lonely", label: "Lonely", icon: "account-off-outline" },
+      { id: "discouraged", label: "Discouraged", icon: "arrow-down-bold-circle-outline" },
+      { id: "numb", label: "Numb", icon: "emoticon-dead-outline" },
+    ],
+  },
+  {
+    id: "anxious", title: "On edge", description: "Stressed, anxious, overwhelmed",
+    moods: [
+      { id: "anxious", label: "Anxious", icon: "alert-circle-outline" },
+      { id: "stressed", label: "Stressed", icon: "clock-alert-outline" },
+      { id: "overwhelmed", label: "Overwhelmed", icon: "water" },
+    ],
+  },
+  {
+    id: "angry", title: "Irritated or angry", description: "Irritated, frustrated, or mad",
+    moods: [
+      { id: "annoyed", label: "Annoyed", icon: "emoticon-angry-outline" },
+      { id: "frustrated", label: "Frustrated", icon: "emoticon-angry-outline" },
+      { id: "angry", label: "Angry", icon: "emoticon-angry-outline" },
+    ],
+  },
+];
+
 type Comment = {
   id: string;
   postId: string;
@@ -141,6 +201,43 @@ const [showRateCard, setShowRateCard] = useState(false);
   const [habits, setHabits] = useState([]);
   const [currentMood, setCurrentMood] = useState<any>(null);
   const [friendsMoods, setFriendsMoods] = useState<any[]>([]);
+
+  // Add this inside your Dashboard component next to your other refs/states
+  const moodSheetRef = useRef<TrueSheet>(null);
+  const [isSavingMood, setIsSavingMood] = useState(false);
+  const [selectedMoodId, setSelectedMoodId] = useState<string | null>(null);
+
+  // Pagination States
+const [page, setPage] = useState(1);
+const [hasMore, setHasMore] = useState(true);
+const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  const handleLogMood = async (moodId: string) => {
+    if (isSavingMood) return;
+    setIsSavingMood(true);
+    setSelectedMoodId(moodId);
+
+    try {
+      const res = await MoodService.logMood(moodId);
+      if (res.data?.success) {
+        // Optimistically update the UI instantly without reloading!
+        setCurrentMood({ mood: moodId });
+        // Close the sheet smoothly
+        setTimeout(() => {
+          moodSheetRef.current?.dismiss();
+          setIsSavingMood(false);
+        }, 300);
+      } else {
+        setGlassAlertConfig({ title: "Error", message: res.data?.message || "Failed to save mood", type: "error" });
+        setGlassAlertVisible(true);
+        setIsSavingMood(false);
+      }
+    } catch (e: any) {
+      setGlassAlertConfig({ title: "Error", message: e.response?.data?.message || "Failed to save mood", type: "error" });
+      setGlassAlertVisible(true);
+      setIsSavingMood(false);
+    }
+  };
 
   // ============================================================
   // ACTIVITY FEED STATE
@@ -306,27 +403,67 @@ const [showRateCard, setShowRateCard] = useState(false);
     }
   };
 
-  const loadFeed = async (isRefresh = false) => {
-    if (isRefresh) setIsRefreshingFeed(true);
-    else setIsLoadingFeed(true);
+  const loadFeed = async (pageNumber = 1, isRefresh = false) => {
+  if (isRefresh) setIsRefreshingFeed(true);
+  else if (pageNumber === 1) setIsLoadingFeed(true);
+  else setIsLoadingMore(true);
 
-    try {
-      const res: any = await FeedAPI.GetFeed(activeTab);
-      const feedData = res?.posts || res?.data?.posts || [];
-      const formattedPosts = feedData.map((post: any) => {
-        const cleanPath = post.mediaUrl ? post.mediaUrl.replace(/\\/g, '/') : '';
-        const fullImageUrl = cleanPath.startsWith("http") ? cleanPath : `${baseUrl}${cleanPath}`;
-        return { ...post, mediaUrl: fullImageUrl };
-      });
+  try {
+    const res: any = await FeedAPI.GetFeed(activeTab, pageNumber);
+    const feedData = res?.posts || res?.data?.posts || [];
+    
+    const formattedPosts = feedData.map((post: any) => {
+      const cleanPath = post.mediaUrl ? post.mediaUrl.replace(/\\/g, '/') : '';
+      const fullImageUrl = cleanPath.startsWith("http") ? cleanPath : `${baseUrl}${cleanPath}`;
+      return { ...post, mediaUrl: fullImageUrl };
+    });
+
+    if (pageNumber === 1) {
       setPosts(formattedPosts);
-      resolveAvatars(formattedPosts);
-    } catch (e) {
-      console.log("Failed to load feed", e);
-    } finally {
-      setIsRefreshingFeed(false);
-      setIsLoadingFeed(false);
+    } else {
+      // Append new posts to the bottom
+      setPosts(prev => [...prev, ...formattedPosts]);
     }
-  };
+
+    // If we received fewer than 10 posts, we've hit the end of the database
+    if (formattedPosts.length < 10) {
+      setHasMore(false);
+    } else {
+      setHasMore(true);
+    }
+
+    resolveAvatars(formattedPosts);
+  } catch (e) {
+    console.log("Failed to load feed", e);
+  } finally {
+    setIsRefreshingFeed(false);
+    setIsLoadingFeed(false);
+    setIsLoadingMore(false);
+  }
+};
+
+// Reset and load from page 1 when the tab changes
+useEffect(() => {
+  setPage(1);
+  setHasMore(true);
+  loadFeed(1);
+}, [activeTab]);
+
+// Handlers for FlatList actions
+const handleRefresh = () => {
+  setPage(1);
+  setHasMore(true);
+  loadFeed(1, true);
+};
+
+const handleLoadMore = () => {
+  // Only trigger if we aren't already loading, and there are more posts to fetch
+  if (!isLoadingMore && hasMore && !isLoadingFeed && !isRefreshingFeed) {
+    const nextPage = page + 1;
+    setPage(nextPage);
+    loadFeed(nextPage, false);
+  }
+};
 
   useEffect(() => {
     loadFeed();
@@ -756,16 +893,33 @@ const fetchDashboardInBackground = useCallback(async () => {
 
           {/* MAIN SCROLL CONTAINER (Optimized with FlatList) */}
           <FlatList
-            data={posts}
-            keyExtractor={(item) => item.id}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContent}
-            
-            // ⚡ Performance Props for buttery smooth scrolling
-            removeClippedSubviews={Platform.OS === 'android'}
-            initialNumToRender={3}
-            maxToRenderPerBatch={3}
-            windowSize={5}
+  data={posts}
+  keyExtractor={(item) => item.id}
+  showsVerticalScrollIndicator={false}
+  contentContainerStyle={styles.scrollContent}
+  
+  // Performance Props
+  removeClippedSubviews={Platform.OS === 'android'}
+  initialNumToRender={5}
+  maxToRenderPerBatch={5}
+  windowSize={10}
+
+  // ⚡ 1. BEAUTIFUL PULL TO REFRESH (Matches your dark glass theme)
+  refreshControl={
+    <RefreshControl
+      refreshing={isRefreshingFeed}
+      onRefresh={handleRefresh}
+      tintColor="#A855F7" // iOS purple spinner
+      colors={["#A855F7", "#8B5CF6"]} // Android purple gradient spinner
+      progressBackgroundColor="#0F172A" // Android dark glass background
+      title="Pull to refresh..." // iOS text
+      titleColor="#9CA3AF"
+    />
+  }
+
+  // ⚡ 2. INFINITE SCROLL TRIGGERS
+  onEndReached={handleLoadMore}
+  onEndReachedThreshold={0.5} // Triggers when user is halfway through the last post
 
             // 1. HEADER (Everything above the posts)
             ListHeaderComponent={
@@ -786,11 +940,15 @@ const fetchDashboardInBackground = useCallback(async () => {
                 {/* MOOD NOTES BAR */}
                 <View style={styles.notesWrapper}>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.notesContainer}>
-                    <TouchableOpacity
-                      activeOpacity={0.8}
-                      style={styles.noteItem}
-                      onPress={() => navigation.navigate("MoodScreen", { currentMoodId: currentMood?.mood || null })}
-                    >
+                    {/* Find this block inside your horizontal ScrollView and update the onPress */}
+<TouchableOpacity
+  activeOpacity={0.8}
+  style={styles.noteItem}
+  onPress={() => {
+    setSelectedMoodId(currentMood?.mood || null); // pre-select current mood
+    moodSheetRef.current?.present(); // Pop up the sheet!
+  }}
+>
                       <View style={styles.noteAvatarContainer}>
                         <View style={styles.noteSpeechBubble}>
                           {currentMood && MOOD_METADATA[currentMood.mood] ? (
@@ -836,7 +994,14 @@ const fetchDashboardInBackground = useCallback(async () => {
                           : null;
 
                         return (
-                          <TouchableOpacity key={friend.id || friend._id} activeOpacity={0.8} style={styles.noteItem}>
+                          <TouchableOpacity key={friend.id || friend._id} onPress={() =>
+          navigation.navigate("ProfilePreview", {
+            userId: friend._id,
+            name: friend.name,
+            username: friend.username,
+          })
+        }
+         activeOpacity={0.8} style={styles.noteItem}>
                             <View style={styles.noteAvatarContainer}>
                               {fMoodMeta && (
                                 <View style={styles.noteSpeechBubble}>
@@ -1008,7 +1173,21 @@ const fetchDashboardInBackground = useCallback(async () => {
             }}
 
             // 4. FOOTER SPACER
-            ListFooterComponent={<View style={{ height: 60 }} />}
+           ListFooterComponent={
+    <View style={{ height: 100, justifyContent: 'center', alignItems: 'center', paddingBottom: 40 }}>
+      {isLoadingMore ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <ActivityIndicator size="small" color="#A855F7" />
+          <Text style={{ color: "#9CA3AF", fontSize: 13, marginLeft: 10 }}>Loading more...</Text>
+        </View>
+      ) : !hasMore && posts.length > 0 ? (
+        <View style={{ flexDirection: 'column', alignItems: 'center', opacity: 0.7 }}>
+          <View style={{ width: 40, height: 4, backgroundColor: 'rgba(148, 163, 184, 0.2)', borderRadius: 2, marginBottom: 10 }} />
+          <Text style={{ color: "#94A3B8", fontSize: 13, fontWeight: "600" }}>You're all caught up!</Text>
+        </View>
+      ) : null}
+    </View>
+  }
           />
         </View>
 
@@ -1160,6 +1339,69 @@ const fetchDashboardInBackground = useCallback(async () => {
           </View>
         </TrueSheet>
 
+        {/* MOOD SELECTOR SHEET */}
+        <TrueSheet 
+          ref={moodSheetRef} 
+          detents={[0.85]} 
+          cornerRadius={28} 
+          backgroundColor="#0F172A" 
+          grabber={false}
+        >
+          <View style={{ height: SCREEN_HEIGHT * 0.85 - 20, paddingHorizontal: 16 }}>
+            <View style={{ alignItems: 'center', marginBottom: 20, marginTop: 20 }}>
+              <Text style={styles.mainTitle}>How are you feeling?</Text>
+              <Text style={styles.subtitle}>Tap one mood to share.</Text>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+              {MOOD_GROUPS.map((group) => (
+                <View key={group.id} style={styles.card}>
+
+                  <View style={styles.moodGrid}>
+                    {group.moods.map((mood) => {
+                      const isSelected = selectedMoodId === mood.id;
+                      const moodColor = MOOD_COLORS[mood.id] || "#C4B5FD";
+
+                      return (
+                        <TouchableOpacity
+                          key={mood.id}
+                          activeOpacity={0.85}
+                          style={[
+                            styles.moodItem,
+                            isSelected && { backgroundColor: moodColor, borderColor: moodColor },
+                          ]}
+                          onPress={() => handleLogMood(mood.id)}
+                          disabled={isSavingMood}
+                        >
+                          <View style={styles.moodIconWrap}>
+                            {isSavingMood && isSelected ? (
+                              <ActivityIndicator size="small" color="#fff" />
+                            ) : (
+                              <Icon
+                                name={mood.icon}
+                                size={20}
+                                color={isSelected ? "#020617" : moodColor}
+                              />
+                            )}
+                          </View>
+                          <Text
+                            style={[
+                              styles.moodLabel,
+                              isSelected && styles.moodLabelSelected,
+                            ]}
+                          >
+                            {isSavingMood && isSelected ? "Updating..." : mood.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </TrueSheet>
+
         {/* CUSTOM GLASSY ALERT MODAL */}
         <Modal visible={glassAlertVisible} transparent animationType="fade" onRequestClose={() => setGlassAlertVisible(false)}>
           <View style={styles.glassModalOverlay}>
@@ -1188,6 +1430,29 @@ const DashboardSkeleton = () => (
 );
 
 const styles = StyleSheet.create({
+  // Add these to the bottom of your styles = StyleSheet.create({...}) in Dashboard.tsx
+  mainTitle: { fontSize: 24, fontWeight: "700", color: "#F9FAFB", marginBottom: 4 },
+  subtitle: { fontSize: 13, color: "#9CA3AF" },
+  moodGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  moodItem: {
+    width: "31%",
+    aspectRatio: 1,
+    borderRadius: 20,
+    backgroundColor: "rgba(15, 23, 42, 0.8)",
+    borderWidth: 1,
+    borderColor: "rgba(148, 163, 184, 0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 5,
+  },
+  moodIconWrap: { marginBottom: 20, height: 20, justifyContent: "center" },
+  moodLabel: { fontSize: 12, color: "#E5E7EB", textAlign: "center", fontWeight: "500" },
+  moodLabelSelected: { color: "#020617", fontWeight: "800" },
   root: { flex: 1 },
   baseBackground: { ...StyleSheet.absoluteFill, backgroundColor: "#020617" },
   overlay: { flex: 1, paddingTop: Platform.OS === "android" ? "3%" : "5%" },

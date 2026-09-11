@@ -211,7 +211,8 @@ export const addComment = async (req, res) => {
     post.commentsCount += 1;
     await post.save();
 
-    await newComment.populate("user", "username avatarUrl tick isPremium");
+    // ⚡ FIX: Added "name" to the populate string
+    await newComment.populate("user", "name username avatarUrl tick isPremium");
 
     // ⚡ NEW: Send Push Notification (Don't notify if commenting on own post)
     if (post.user.toString() !== userId.toString()) {

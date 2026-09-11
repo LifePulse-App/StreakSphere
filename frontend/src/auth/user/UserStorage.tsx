@@ -14,10 +14,10 @@ const setUser = async (User: UserLoginResponse) => {
     );
   } catch (error: any) {
     console.log('Keychain setUser error:', error);
-    Alert.alert(
-      'Error',
-      `Error Storing User: ${String(error?.message || error)}`,
-    );
+    // Alert.alert(
+    //   'Error',
+    //   `Error Storing User: ${String(error?.message || error)}`,
+    // );
   }
 };
 
@@ -41,11 +41,11 @@ const getUser = async () => {
       }
 
       // No alert needed; just go to Login
-      resetToLogin();
+      // resetToLogin();
       return null;
     }
 
-    Alert.alert('Error', 'Error Getting User');
+    // Alert.alert('Error', 'Error Getting User');
     return null;
   }
 };
@@ -55,7 +55,7 @@ const deleteUser = async () => {
     return await Keychain.resetGenericPassword();
   } catch (error: any) {
     console.log('Keychain deleteUser error:', error);
-    Alert.alert('Error', 'Error Deleting User');
+    // Alert.alert('Error', 'Error Deleting User');
   }
 };
 
@@ -77,10 +77,10 @@ const setAccessToken = async (accessToken: string | null | undefined) => {
     );
   } catch (error: any) {
     console.log('Keychain setAccessToken error:', error);
-    Alert.alert(
-      'Error',
-      `Error storing access token: ${String(error?.message || error)}`,
-    );
+    // Alert.alert(
+    //   'Error',
+    //   `Error storing access token: ${String(error?.message || error)}`,
+    // );
   }
 };
 
@@ -90,7 +90,7 @@ const getAccessToken = async (): Promise<string | null> => {
     return creds?.password || null;
   } catch (error: any) {
     console.log('Keychain getAccessToken error:', error);
-    Alert.alert('Error', 'Error getting access token');
+    // Alert.alert('Error', 'Error getting access token');
     return null;
   }
 };
@@ -113,10 +113,10 @@ const setRefreshToken = async (refreshToken: string | null | undefined) => {
     );
   } catch (error: any) {
     console.log('Keychain setRefreshToken error:', error);
-    Alert.alert(
-      'Error',
-      `Error storing refresh token: ${String(error?.message || error)}`,
-    );
+    // Alert.alert(
+    //   'Error',
+    //   `Error storing refresh token: ${String(error?.message || error)}`,
+    // );
   }
 };
 
@@ -126,7 +126,7 @@ const getRefreshToken = async (): Promise<string | null> => {
     return creds?.password || null;
   } catch (error: any) {
     console.log('Keychain getRefreshToken error:', error);
-    Alert.alert('Error', 'Error getting refresh token');
+    // Alert.alert('Error', 'Error getting refresh token');
     return null;
   }
 };

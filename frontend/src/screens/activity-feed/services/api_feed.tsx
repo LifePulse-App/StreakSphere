@@ -3,7 +3,10 @@ import client from "../../../auth/api-client/api_client"; // Adjust path as need
 const endpoint = '/feed';
 
 // Post APIs
-const GetFeed = (tab: string) => client.get(`${endpoint}?tab=${tab}`);
+// Inside api_feed.ts
+const GetFeed = (tab: string, page: number = 1, limit: number = 10) => {
+  return client.get(`${endpoint}?tab=${tab}&page=${page}&limit=${limit}`);
+};
 const GetUserPosts = (userId: string) => client.get<any>(`${endpoint}/user/${userId}/posts`);
 const ToggleLikePost = (postId: string) => client.post(`${endpoint}/post/${postId}/like`);
 const DeletePost = (postId: string) => client.delete(`${endpoint}/post/${postId}`);

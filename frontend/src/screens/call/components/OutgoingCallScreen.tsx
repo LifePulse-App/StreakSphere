@@ -29,6 +29,7 @@ export const OutgoingCallScreen = () => {
   if (!callContext || !callContext.currentSession) return null;
   const { currentSession, endCall, toggleMinimize, audioRoute, availableRoutes, handleSpeakerPress } = callContext;
   const { remoteUser, status } = currentSession;
+  
 
   // ⚡ 2. Group 'busy' and 'no-answer' into one error state
   const isError = status === 'busy' || status === 'no-answer';
@@ -93,15 +94,16 @@ export const OutgoingCallScreen = () => {
           />
 
           {/* ⚡ 4. Apply the red color override to the static glow if error */}
-          <View style={[styles.avatarGlow, isError && { borderColor: 'rgba(239,68,68,0.5)', backgroundColor: 'rgba(239,68,68,0.2)' }]}>
-            {remoteUser.avatar ? (
-              <Image source={{ uri: remoteUser.avatar }} style={styles.avatarImage} />
-            ) : (
-              <View style={styles.avatarPlaceholder}>
-                <Text style={styles.avatarText}>{remoteUser.name.charAt(0)}</Text>
-              </View>
-            )}
-          </View>
+         
+<View style={[styles.avatarGlow, isError && { borderColor: 'rgba(239,68,68,0.5)', backgroundColor: 'rgba(239,68,68,0.2)' }]}>
+  {remoteUser.avatar ? (
+    <Image source={{ uri: remoteUser.avatar }} style={styles.avatarImage} />
+  ) : (
+    <View style={styles.avatarPlaceholder}>
+      <Icon name="account" size={80} color="#fff" /> {/* ⚡ CHANGED TO MATCH OTHER SCREENS */}
+    </View>
+  )}
+</View>
         </View>
 
         <Text style={styles.userName} numberOfLines={1}>{remoteUser.name}</Text>

@@ -159,7 +159,6 @@ const ChatRowItem = ({ item, navigation, onHideRequest, onCallRequest }: any) =>
     <Swipeable 
       ref={swipeRef} 
       renderRightActions={renderRightActions} 
-      renderLeftActions={renderLeftActions}
       leftThreshold={75}
       rightThreshold={75}
       onSwipeableLeftWillOpen={() => {

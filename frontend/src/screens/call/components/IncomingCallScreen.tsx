@@ -50,7 +50,7 @@ export const IncomingCallScreen = () => {
               style={styles.avatarImage} 
             />
           ) : (
-            <Text style={styles.avatarText}>{remoteUser.name.charAt(0)}</Text>
+            <Icon name="account" size={32} color="#fff" />
           )}
         </View>
 

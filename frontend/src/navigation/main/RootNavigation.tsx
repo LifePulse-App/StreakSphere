@@ -28,7 +28,7 @@ export const logout = async (currentUserId: string) => {
     await UserStorage.deleteUser();
     resetToLogin();
   } catch (err) {
-    console.log(err);
+    // console.log(err);
     await UserStorage.clearTokens();
     await UserStorage.deleteUser();
     resetToLogin();

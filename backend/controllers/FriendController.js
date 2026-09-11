@@ -58,10 +58,10 @@ export const sendFriendRequest = catchAsyncErrors(async (req, res) => {
   await them.save();
   
   await sendToUser(targetUserId, {
-    ...TEMPLATES.FRIEND_REQUEST_SENT(req.user.name),
+    ...TEMPLATES.FRIEND_REQUEST_SENT(me.name),
     extra: {
       fromUserId: String(req.user._id),
-      fromName: String(req.user.name),
+      fromName: String(me.name),
     },
   });
   
@@ -92,10 +92,10 @@ const currentUserId = req.user.id;
   await me.save();
   await them.save();
   await sendToUser(requesterId, {
-    ...TEMPLATES.FRIEND_REQUEST_ACCEPTED(req.user.name),
+    ...TEMPLATES.FRIEND_REQUEST_ACCEPTED(me.name),
     extra: {
       fromUserId: String(req.user._id),
-      fromName: String(req.user.name),
+      fromName: String(me.name),
     },
   });
   return res.json({ message: "Request accepted", isFriend: true, isPremium: me.isPremium });
@@ -332,7 +332,11 @@ export const searchUsers = catchAsyncErrors(async (req, res) => {
 
 export const suggestedFriends = catchAsyncErrors(async (req, res) => {
   const currentUserId = req.user._id;
-  const limit = parseInt(req.query.limit) || 20;
+  
+  // ⚡ 1. Extract pagination params from the query (Default: Page 1, Limit 10)
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const skip = (page - 1) * limit;
 
   const me = await User.findById(currentUserId)
     .select("friendRequests friends blockedUsers blockedBy isPremium")
@@ -347,8 +351,17 @@ export const suggestedFriends = catchAsyncErrors(async (req, res) => {
     ...blockedIds
   ];
 
+  // ⚡ 2. Count total available users to determine if there are more pages
+  const totalUsers = await User.countDocuments({ 
+    accountStatus: 'active', 
+    _id: { $nin: excludeIds } 
+  });
+
+  // ⚡ 3. Apply skip, limit, and a STABLE sort (Required for pagination)
   let users = await User.find({ accountStatus: 'active', _id: { $nin: excludeIds } })
-    .select("name username avatarUrl friendRequests friends isPremium premiumPreferences tick") // ⚡ Fetch premium preferences
+    .select("name username avatarUrl friendRequests friends isPremium premiumPreferences tick") 
+    .sort({ createdAt: -1 }) // Do not use random shuffle, it breaks pagination!
+    .skip(skip)
     .limit(limit)
     .lean();
 
@@ -357,7 +370,6 @@ export const suggestedFriends = catchAsyncErrors(async (req, res) => {
     const requestSent = u.friendRequests?.some(r => String(r.user) === String(currentUserId));
     const incoming = me?.friendRequests?.some(r => String(r.user) === String(u._id));
     
-    // ⚡ Safely calculate badge visibility based on preference
     const showBadge = u.isPremium && u.premiumPreferences?.premiumBadge !== false;
     
     return {
@@ -374,8 +386,12 @@ export const suggestedFriends = catchAsyncErrors(async (req, res) => {
     };
   });
 
-  const shuffled = users.sort(() => 0.5 - Math.random());
-  res.status(200).json({ suggestions: shuffled, isPremium: me.isPremium });
+  // ⚡ 4. Return hasMore flag alongside the suggestions
+  res.status(200).json({ 
+    suggestions: users, 
+    hasMore: totalUsers > (skip + users.length), // Tells frontend if it should keep loading
+    isPremium: me.isPremium 
+  });
 });
 
 // ==========================================
@@ -581,46 +597,18 @@ export const sendRelationshipRequest = catchAsyncErrors(async (req, res) => {
   await me.save();
   await them.save();
 
+  // ⚡ Send notification to target user
+  await sendToUser(targetUserId, {
+    ...TEMPLATES.RELATIONSHIP_REQUEST(me.name),
+    extra: {
+      fromUserId: String(me._id),
+      fromName: me.name,
+    },
+  });
+
   return res.json({ message: "Relationship request sent!", requestSent: true, isPremium: me.isPremium });
 });
 
-
-/**
- * Cancel or Decline a pending relationship request
- */
-export const cancelRelationshipRequest = catchAsyncErrors(async (req, res) => {
-  const currentUserId = req.user.id;
-  const { targetUserId } = req.params;
-
-  const me = await User.findById(currentUserId);
-  const them = await User.findById(targetUserId);
-
-  if (!them) return res.status(404).json({ message: "User not found" });
-
-  let modified = false;
-
-  const outIndex = me.relationshipOutgoing?.findIndex(r => String(r.user) === targetUserId);
-  if (outIndex !== -1 && outIndex !== undefined) {
-    me.relationshipOutgoing.splice(outIndex, 1);
-    them.relationshipIncoming = them.relationshipIncoming.filter(r => String(r.user) !== currentUserId);
-    modified = true;
-  }
-
-  const inIndex = me.relationshipIncoming?.findIndex(r => String(r.user) === targetUserId);
-  if (inIndex !== -1 && inIndex !== undefined) {
-    me.relationshipIncoming.splice(inIndex, 1);
-    them.relationshipOutgoing = them.relationshipOutgoing.filter(r => String(r.user) !== currentUserId);
-    modified = true;
-  }
-
-  if (modified) {
-    await me.save();
-    await them.save();
-    return res.json({ message: "Request cancelled.", success: true, isPremium: me.isPremium });
-  }
-
-  return res.status(400).json({ message: "No request found to cancel.", isPremium: me.isPremium });
-});
 
 /**
  * Accept a relationship request & Restore Streak for Premium Users
@@ -652,7 +640,7 @@ export const acceptRelationshipRequest = catchAsyncErrors(async (req, res) => {
   if (lastRelationship) {
     const hoursSinceBreakup = (now.getTime() - new Date(lastRelationship.endedAt).getTime()) / (1000 * 60 * 60);
     
-    // ⚡ Strict check: 36h only applies if the person taking the action (ME) is premium
+    // Strict check: 36h only applies if the person taking the action (ME) is premium
     const allowedHours = me.isPremium ? 36 : 24;
 
     if (hoursSinceBreakup <= allowedHours) {
@@ -677,6 +665,15 @@ export const acceptRelationshipRequest = catchAsyncErrors(async (req, res) => {
   await me.save();
   await them.save();
 
+  // ⚡ Notify the person whose request was accepted
+  await sendToUser(targetUserId, {
+    ...TEMPLATES.RELATIONSHIP_ACCEPTED(me.name),
+    extra: {
+      fromUserId: String(me._id),
+      fromName: me.name,
+    },
+  });
+
   const isRestored = streakStartDate !== now;
   return res.json({ 
     message: isRestored 
@@ -686,6 +683,7 @@ export const acceptRelationshipRequest = catchAsyncErrors(async (req, res) => {
     isPremium: me.isPremium 
   });
 });
+
 
 /**
  * Suspend current partner or Instant Break-up for Premium Users
@@ -700,7 +698,6 @@ export const removeRelationship = catchAsyncErrors(async (req, res) => {
   const them = await User.findById(me.partner);
   const now = new Date();
 
-  // ⚡ Only do instant break-up if the user taking the action (ME) is premium AND chose instant = true
   if (me.isPremium && instant === true) {
     me.relationshipHistory.push({
       partnerId: them ? them._id : me.partner,
@@ -725,6 +722,9 @@ export const removeRelationship = catchAsyncErrors(async (req, res) => {
       them.partnerSince = null;
       them.partnerGracePeriodEnd = null;
       await them.save();
+
+      // ⚡ Notify partner of instant breakup
+      await sendToUser(them._id, TEMPLATES.RELATIONSHIP_ENDED(me.name));
     }
 
     return res.json({ 
@@ -733,7 +733,6 @@ export const removeRelationship = catchAsyncErrors(async (req, res) => {
       isPremium: me.isPremium 
     });
   } else {
-    // ⚡ Strict check: 36h grace period only applies if the person initiating the break up (ME) is premium
     const hoursToWait = me.isPremium ? 36 : 24;
     const graceEnd = new Date(Date.now() + hoursToWait * 60 * 60 * 1000);
     
@@ -743,6 +742,9 @@ export const removeRelationship = catchAsyncErrors(async (req, res) => {
     if (them) {
       them.partnerGracePeriodEnd = graceEnd;
       await them.save();
+
+      // ⚡ Notify partner of suspension
+      await sendToUser(them._id, TEMPLATES.RELATIONSHIP_SUSPENDED(me.name));
     }
 
     return res.json({ 
@@ -753,8 +755,9 @@ export const removeRelationship = catchAsyncErrors(async (req, res) => {
   }
 });
 
+
 /**
- * Restore relationship (Cancels the 24-hour grace period)
+ * Restore relationship (Cancels the grace period)
  */
 export const restoreRelationship = catchAsyncErrors(async (req, res) => {
   const currentUserId = req.user.id;
@@ -776,6 +779,9 @@ export const restoreRelationship = catchAsyncErrors(async (req, res) => {
   if (them) {
     them.partnerGracePeriodEnd = null;
     await them.save();
+
+    // ⚡ Notify partner of restoration
+    await sendToUser(them._id, TEMPLATES.RELATIONSHIP_RESTORED(me.name));
   }
 
   return res.json({ message: "Relationship successfully restored!", success: true, isPremium: me.isPremium });

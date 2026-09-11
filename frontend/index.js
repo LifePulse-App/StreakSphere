@@ -324,10 +324,33 @@ try {
   }
 
   // ⚡ NEW FIX: The Caller Hung Up or Timed Out! Stops the ghost ringing.
+  // ⚡ NEW FIX: The Caller Hung Up! Stop ringing and show Missed Call.
   if (data.type === 'call_ended' || data.type === 'call_missed' || data.type === 'call_cancelled') {
     if (data.callId) {
+      // 1. Cancel the aggressive ringing notification
       await notifee.cancelNotification(String(data.callId));
     }
+
+    // 2. Display a standard "Missed Call" notification
+    const callerName = data.callerName || data.peerName || 'Someone';
+    await notifee.displayNotification({
+      id: `missed_call_${data.callId || Date.now()}`,
+      title: 'Missed Call',
+      body: `You missed a voice call from ${callerName}`,
+      android: {
+        channelId: 'app_notifications', // Standard channel, NO ringtone
+        smallIcon: 'ic_launcher',
+        color: '#ef4444', // Red to indicate missed call
+        importance: AndroidImportance.HIGH,
+        pressAction: { id: 'default' },
+      },
+      ios: {
+        sound: 'default',
+        foregroundPresentationOptions: ['alert', 'sound', 'badge'],
+      },
+      data: { type: 'chat', peerUserId: data.callerId || data.peerUserId } // Routes to chat when clicked
+    });
+    
     return;
   }
 

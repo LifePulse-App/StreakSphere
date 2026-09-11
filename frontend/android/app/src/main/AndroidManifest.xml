@@ -60,6 +60,7 @@
       android:showWhenLocked="true"
       android:turnScreenOn="true"
       android:screenOrientation="portrait"
+      android:resizeableActivity="true"
       android:theme="@style/BootTheme">
       <!-- ADDED: android:screenOrientation="portrait" correctly to activity tag -->
       <intent-filter>

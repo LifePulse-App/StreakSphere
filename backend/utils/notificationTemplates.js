@@ -25,6 +25,38 @@ export const TEMPLATES = {
     type: 'streak_milestone',
   }),
 
+  // ── Relationships ──
+
+  RELATIONSHIP_REQUEST: (fromName) => ({
+    title: `💌 New relationship request`,
+    body: `${fromName} wants to start a relationship with you.`,
+    type: 'relationship_request',
+  }),
+
+  RELATIONSHIP_ACCEPTED: (fromName) => ({
+    title: `💖 Relationship started!`,
+    body: `${fromName} accepted your relationship request. You both are now in relationship.`,
+    type: 'relationship_accepted',
+  }),
+
+  RELATIONSHIP_SUSPENDED: (fromName) => ({
+    title: `⚠️ Relationship suspended`,
+    body: `${fromName} suspended your relationship. You both are now in the grace period.`,
+    type: 'relationship_suspended',
+  }),
+
+  RELATIONSHIP_ENDED: (fromName) => ({
+    title: `💔 Relationship broken`,
+    body: `Your relationship with ${fromName} has broken.`,
+    type: 'relationship_ended',
+  }),
+
+  RELATIONSHIP_RESTORED: (fromName) => ({
+    title: `❤️‍🩹 Relationship patched`,
+    body: `${fromName} patched relationship with you. Your streak is safe!`,
+    type: 'relationship_restored',
+  }),
+
   // ── Leaderboard ──
 
   LEADERBOARD_REFRESH: () => ({
@@ -55,7 +87,7 @@ export const TEMPLATES = {
 
   FRIEND_REQUEST_ACCEPTED: (fromName) => ({
     title: `🤝 Friend request accepted`,
-    body: `${fromName} is now your friend.`,
+    body: `${fromName} and you both are friends now.`,
     type: 'friend_accepted',
   }),
 

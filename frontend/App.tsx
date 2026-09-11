@@ -423,6 +423,33 @@ const App = () => {
       return onMessage(messagingInstance, async remoteMessage => {
         const data = remoteMessage?.data || {};
 
+        // ⚡ NEW: Handle call cancellations in the foreground
+        if (data.type === 'call_ended' || data.type === 'call_missed' || data.type === 'call_cancelled') {
+          if (data.callId) {
+            await notifee.cancelNotification(String(data.callId));
+          }
+          
+          const callerName = data.callerName || data.peerName || 'Someone';
+          await notifee.displayNotification({
+            id: `missed_call_${data.callId || Date.now()}`,
+            title: 'Missed Call',
+            body: `You missed a voice call from ${callerName}`,
+            android: {
+              channelId: 'app_notifications',
+              color: '#ef4444',
+              importance: AndroidImportance.HIGH,
+              pressAction: { id: 'default' },
+            },
+            ios: { sound: 'default' },
+            data: { type: 'chat', peerUserId: data.callerId || data.peerUserId }
+          });
+
+          // ⚡ Optional: Alert your UI components that the call ended so the ringing screen closes
+          DeviceEventEmitter.emit('call_ended_remotely', data);
+          return;
+        }
+
+
         if (data.type === 'general' || data.type === 'admin_broadcast' || data.type === 'admin_direct' || data.title) {
           try {
             await notifee.displayNotification({
@@ -491,7 +518,7 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    if (Platform.OS !== 'android' && Platform.OS !== 'ios') return;
+    if (Platform.OS !== 'android' && Platform.OS !== 'ios' || !User) return;
 
     let unsubscribeTokenRefresh: undefined | (() => void);
 
@@ -650,7 +677,7 @@ const App = () => {
           // Set to 3 seconds (3000ms) for quick testing, change back to 30000 later if needed
           timer = setTimeout(() => {
             setShowRateCard(true);
-          }, 45000); 
+          }, 60000); 
         }
       } catch (e) {
         console.log("Error checking rate status:", e);
