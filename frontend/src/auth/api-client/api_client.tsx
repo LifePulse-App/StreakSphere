@@ -80,8 +80,7 @@ apiClient.axiosInstance.interceptors.response.use(
 
   // ⚡ ADDED: Intercept suspended or banned accounts globally (HTTP 403)
     if (status === 403 && (data?.accountStatus === 'suspended' || data?.accountStatus === 'banned')) {
-      console.log(data);
-      
+      // console.log(data);
       
       // ⚡ Skip redirecting if they are currently trying to submit an appeal!
       if (url.includes('/appeal')) {

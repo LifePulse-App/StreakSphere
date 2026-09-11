@@ -518,7 +518,7 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    if (Platform.OS !== 'android' && Platform.OS !== 'ios') return;
+    if (Platform.OS !== 'android' && Platform.OS !== 'ios' || !User) return;
 
     let unsubscribeTokenRefresh: undefined | (() => void);
 
@@ -677,7 +677,7 @@ const App = () => {
           // Set to 3 seconds (3000ms) for quick testing, change back to 30000 later if needed
           timer = setTimeout(() => {
             setShowRateCard(true);
-          }, 45000); 
+          }, 60000); 
         }
       } catch (e) {
         console.log("Error checking rate status:", e);
