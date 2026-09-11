@@ -206,7 +206,7 @@ export const welcomeEmailHtml = ({ username, email }) =>
     bodyHtml: `
       <div style="${s.badge('rgba(16,185,129,0.1)', '#10B981')}">✦ Account Activated</div>
       <h1 style="${s.h1}">Welcome, ${username || email} 👋</h1>
-      <p style="${s.p}">Your StreakSphere account is officially live. Start tracking habits, building streaks, and staying consistent — one day at a time.</p>
+      <p style="${s.p}">Your StreakSphere account is officially live. Now start exploring new ERA Of Social Media.</p>
       <div style="${s.safeBox}">🛡️ Didn't sign up? You can safely ignore this email — your account requires email confirmation to activate.</div>
     `
   });
@@ -250,7 +250,7 @@ export const loginAlertEmailHtml = ({ username, email, deviceInfo, location, ip,
     bodyHtml: `
       <div style="${s.badge('rgba(239,68,68,0.1)', '#EF4444')}">🔔 Security Alert</div>
       <h1 style="${s.h1}">New login detected</h1>
-      <p style="${s.p}">Hi ${username || email}, a sign-in to your account was just recorded.</p>
+      <p style="${s.p}">Hi ${username || email}, a sign-in to your account was just attempted.</p>
       
       <div style="${s.infoBox}">
         <div style="${s.infoRow}"><p style="${s.infoLabel}">Device</p><p style="${s.infoValue}">${deviceInfo?.deviceName || 'Unknown'} ${deviceInfo?.deviceModel || ''}</p></div>
