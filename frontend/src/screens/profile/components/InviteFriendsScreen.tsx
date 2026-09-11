@@ -28,11 +28,11 @@ export default function InviteFriendsScreen() {
   
   // ⚡ NEW: Pull the username dynamically from your context
   const authContext = useContext(AuthContext);
-  const username = authContext?.User?.user?.username
+  const me = socialApi.previewProfile(authContext?.User?.user.id)
   
 
   // ⚡ NEW: Moved INVITE_TEXT inside so it can use the dynamic 'username' variable
-  const INVITE_TEXT = `Hey👋\nI am on StreakSphere. Add me on there for new things! Let's explore new Era Of Social Media together: ${APP_LINK}`;
+  const INVITE_TEXT = `Hey👋\nI am on StreakSphere as @${me?.username}. Add me on there for new things! Let's explore new Era Of Social Media together: ${APP_LINK}`;
 
   const [suggestedUsers, setSuggestedUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

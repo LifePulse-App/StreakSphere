@@ -787,6 +787,43 @@ export const restoreRelationship = catchAsyncErrors(async (req, res) => {
   return res.json({ message: "Relationship successfully restored!", success: true, isPremium: me.isPremium });
 });
 
+/**
+ * Cancel or Decline a pending relationship request
+ */
+export const cancelRelationshipRequest = catchAsyncErrors(async (req, res) => {
+  const currentUserId = req.user.id;
+  const { targetUserId } = req.params;
+
+  const me = await User.findById(currentUserId);
+  const them = await User.findById(targetUserId);
+
+  if (!them) return res.status(404).json({ message: "User not found" });
+
+  let modified = false;
+
+  const outIndex = me.relationshipOutgoing?.findIndex(r => String(r.user) === targetUserId);
+  if (outIndex !== -1 && outIndex !== undefined) {
+    me.relationshipOutgoing.splice(outIndex, 1);
+    them.relationshipIncoming = them.relationshipIncoming.filter(r => String(r.user) !== currentUserId);
+    modified = true;
+  }
+
+  const inIndex = me.relationshipIncoming?.findIndex(r => String(r.user) === targetUserId);
+  if (inIndex !== -1 && inIndex !== undefined) {
+    me.relationshipIncoming.splice(inIndex, 1);
+    them.relationshipOutgoing = them.relationshipOutgoing.filter(r => String(r.user) !== currentUserId);
+    modified = true;
+  }
+
+  if (modified) {
+    await me.save();
+    await them.save();
+    return res.json({ message: "Request cancelled.", success: true, isPremium: me.isPremium });
+  }
+
+  return res.status(400).json({ message: "No request found to cancel.", isPremium: me.isPremium });
+});
+
 export const blockUser = catchAsyncErrors(async (req, res) => {
   const currentUserId = req.user.id;
   const { targetUserId } = req.params;
