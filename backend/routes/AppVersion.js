@@ -7,16 +7,16 @@ const router = express.Router();
  */
 const VERSION_POLICY = {
   android: {
-    latestVersion: '5.0.0',
-    minSupportedVersion: '5.0.0',
-    updateUrl: 'https://streaksphere.app',
+    latestVersion: '6.2.0',
+    minSupportedVersion: '6.1.0',
+    updateUrl: 'https://play.google.com/store/apps/details?id=com.streaksphere',
     title: 'Update required',
     message: 'A new version is available. Please update your app to continue.',
   },
   ios: {
-    latestVersion: '5.0.0',
-    minSupportedVersion: '5.0.0',
-    updateUrl: 'https://streaksphere.app',
+    latestVersion: '6.2.0',
+    minSupportedVersion: '6.1.0',
+    updateUrl: 'https://streaksphere.app/ios-beta.html',
     title: 'Update required',
     message: 'A new version is available. Please update your app to continue.',
   },
